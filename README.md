@@ -1,5 +1,5 @@
 # midi-visualization
-A revised version of python package for midi-visualization, originally distributed in [github.com/exeex/midi-vsualization](https://github.com/fexeex/midi-visualization/).
+A revised version of python package for midi-visualization, originally distributed in [github.com/exeex/midi-vsualization](https://github.com/exeex/midi-visualization/).
 
 ## Updates from original version
 
