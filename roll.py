@@ -178,6 +178,7 @@ class MidiFile(mido.MidiFile):
         return array
 
     def _grp_init(self, figsize=(15,9), xlim=None, ylim=None):
+        plt.rcParams["font.size"] = 20
         fig = plt.figure(figsize=figsize)
         ax = fig.add_subplot(111)
         ax.axis("equal")
@@ -211,14 +212,14 @@ class MidiFile(mido.MidiFile):
 
         # change scale and label of y axis
         plt.yticks([y*16 for y in range(8)], [y*16 for y in range(8)])
-
+        ax.set_xlabel("time [s]")
         if xlim!=None:
             ticks_per_sec=x_label_interval/x_label_period_sec
             print("ticks/second 2:", ticks_per_sec)
             ax.set_xlim(np.array(xlim)*ticks_per_sec)
 
         if ylim!=None:
-            ax.set_xlim(ylim)
+            ax.set_ylim(ylim)
 
         return fig, ax
 
@@ -285,7 +286,7 @@ class MidiFile(mido.MidiFile):
 
 if __name__ == "__main__":
     dir="../data/pedb2_v0.0.1.b/"
-    target="bac-inv001-s-p2"
+    target="bac-inv001-o-p2"
     path="{0}/{1}/{1}.mid".format(dir,target)
     mid = MidiFile(path)
 
@@ -296,7 +297,7 @@ if __name__ == "__main__":
     roll = mid.get_roll(verbose=False)
 
     # draw piano roll by pyplot
-    mid.draw_roll(figsize=(18,6),xlim=[0,10],ylim=None,colorbar=False)
+    mid.draw_roll(figsize=(18,6),xlim=[0,8],ylim=[32,96],colorbar=False)
     #mid.draw_roll(figsize=(18,6), colorbar=False)
 
 
