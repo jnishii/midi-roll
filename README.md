@@ -1,34 +1,27 @@
 # midi-visualization
-A python package for midi-visualization which works with numpy, matplotlib and mido
+A revised version of python package for midi-visualization, originally distributed in [github.com/exeex/midi-vsualization]((https://github.com/fexeex/midi-visualization/).
 
-![output image](https://github.com/exeex/midi-visualization/raw/master/test_file/visualiztion%20of%20midi.PNG "output image")
+## Updates from original version
 
-You must install *numpy*, *matplotlib* and *mido* before you use it.
+I added some arguments to functions, and some minor corrections for the code.
 
-If you have a script which parse midi files with mido.
-You can just use this:
+- `mid.get_roll()`
+    - `verbose=False`
+- `mid.draw_roll()`
+    - new args:
+        - `figsize`
+        - `xlim`
+        - `ylim`
+        - `colorbar=False`
+    - put title on the top
+    - save a fig as png
+
+## Usage
+
+Just see the `__main__` block in the script like this:
+
 ```
-from roll import MidiFile
-```
-to replace mido.MidiFile
-
-
-
-# How to use it?
-Just see the __main__ block in the script
-You can just run the script to see how it works
-
-```
-if __name__ == "__main__":
-    mid = MidiFile("test_file/1.mid")
-
-    # get the list of all events
-    # events = mid.get_events()
-
-    # get the np array of piano roll image
-    roll = mid.get_roll()
-
-    # draw piano roll by pyplot
-    mid.draw_roll()
-
+mid = MidiFile("some_good_music.mid") # set file path
+roll = mid.get_roll(verbose=False)
+mid.draw_roll(figsize=(18,6),xlim=[0,10],colorbar=False)
 ```
