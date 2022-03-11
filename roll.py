@@ -266,7 +266,7 @@ class MidiFile(mido.MidiFile):
         a1.set_title(self.filename)
         plt.draw()
         plt.ion()
-        plt.savefig(self.filename+".png", bbox_inches="tight")
+        plt.savefig("outputs/"+self.filename+".png", bbox_inches="tight")
         plt.show(block=True)
 
     def get_tempo(self):
@@ -286,7 +286,8 @@ class MidiFile(mido.MidiFile):
 
 if __name__ == "__main__":
     dir="../data/pedb2_v0.0.1.b/"
-    target="bac-inv001-o-p2"
+    #target="bac-inv001-o-p2"
+    target="bac-wtc101-p-a-p1"
     path="{0}/{1}/{1}.mid".format(dir,target)
     mid = MidiFile(path)
 
@@ -297,8 +298,5 @@ if __name__ == "__main__":
     roll = mid.get_roll(verbose=False)
 
     # draw piano roll by pyplot
-    mid.draw_roll(figsize=(18,6),xlim=[0,8],ylim=[32,96],colorbar=False)
+    mid.draw_roll(figsize=(18,6),xlim=[2,15],ylim=[44,92],colorbar=False)
     #mid.draw_roll(figsize=(18,6), colorbar=False)
-
-
-
