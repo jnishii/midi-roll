@@ -6,32 +6,52 @@ from matplotlib.colors import colorConverter
 import re
 from pathlib import Path
 
-# inherit the origin mido class
 class MidiFile(mido.MidiFile):
 
-    def __init__(self, filename):
-
-        mido.MidiFile.__init__(self, filename)
-        #self.filename = re.split('/',filename)[-1]
-        fpath=Path(filename)
-        self.filename=fpath.stem
-        self.sr = 10
+    def __init__(self, midifile, verbose=False):
+        self.sr = 10   # down sampling rate from MIDI to time axis
         self.meta = {}
-        self.events = self.get_events()
+        self.nchannel = 16
+
+        mido.MidiFile.__init__(self, midifile)
+        #self.midifile = re.split('/',midifile)[-1]
+        fpath=Path(midifile)
+        self.midifile=fpath.stem
+
+        self.events = self.get_events(verbose)
+        self.roll = self.get_roll(self.events)
+
+        return self
+
+    def get_tempo(self):
+        try:
+            return self.meta["set_tempo"]["tempo"]
+        except:
+            return 500000
+
+    def get_total_ticks(self):
+        max_ticks = 0
+        for channel in range(self.nchannel):
+            ticks = sum(msg.time for msg in self.events[channel])
+            if ticks > max_ticks:
+                max_ticks = ticks
+        return max_ticks
 
     def get_events(self, verbose=False):
-        mid = self
+        """
+        Extract self.nchannel (default: 16) channel data from MIDI and return a list.
+        Lyrics and meta data used in extra channels are not include in the list.
+
+        Returns:
+            list : [[ch1],[ch2]....[ch16]]
+        """
         if verbose:
-            print(mid)
+            print(self)
 
-        # There is > 16 channel in midi.tracks. However there is only 16 channel related to "music" events.
-        # We store music events of 16 channel in the list "events" with form [[ch1],[ch2]....[ch16]]
-        # Lyrics and meta data used a extra channel which is not include in "events"
-
-        events = [[] for x in range(16)]
+        events = [[] for x in range(self.nchannel)]
 
         # Iterate all event in the midi and extract to 16 channel form
-        for track in mid.tracks:
+        for track in self.tracks:
             for msg in track:
                 try:
                     channel = msg.channel
@@ -47,27 +67,17 @@ class MidiFile(mido.MidiFile):
 
         return events
 
-    def get_roll(self, verbose=False):
-        events = self.get_events(verbose=verbose)
-        # Identify events, then translate to piano roll
-        # choose a sample ratio(sr) to down-sample through time axis
-        sr = self.sr
+    def get_roll(self, events, verbose=False):
+        """
+        Convert event (channel) data to piano roll
+        """
+        length = self.get_total_ticks() # get total length in tick unit
 
-        # compute total length in tick unit
-        length = self.get_total_ticks()
-
-        # allocate memory to numpy array
-        roll = np.zeros((16, 128, length // sr), dtype="int8")
-
-        # use a register array to save the state(no/off) for each key
-        note_register = [int(-1) for x in range(128)]
-
-        # use a register array to save the state(program_change) for each channel
-        timbre_register = [1 for x in range(16)]
-
+        roll = np.zeros((self.nchannel, 128, length // self.sr), dtype="int8")
+        note_register = [int(-1) for x in range(128)]   # array for the state (on/off) of each key
+        timbre_register = [1 for x in range(16)]        # array for the state (program_change) of each channel
 
         for idx, channel in enumerate(events):
-
             time_counter = 0
             volume = 100
             # Volume would change by control change event (cc) cc7 & cc11
@@ -92,12 +102,11 @@ class MidiFile(mido.MidiFile):
                         print("channel", idx, "pc", msg.program, "time", time_counter, "duration", msg.time)
 
 
-
                 if msg.type == "note_on":
                     if verbose:
                         print("on ", msg.note, "time", time_counter, "duration", msg.time, "velocity", msg.velocity)
-                    note_on_start_time = time_counter // sr
-                    note_on_end_time = (time_counter + msg.time) // sr
+                    note_on_start_time = time_counter // self.sr
+                    note_on_end_time = (time_counter + msg.time) // self.sr
                     intensity = volume * msg.velocity // 127
 
 					# When a note_on event *ends* the note start to be play 
@@ -116,8 +125,8 @@ class MidiFile(mido.MidiFile):
                 if msg.type == "note_off":
                     if verbose:
                         print("off", msg.note, "time", time_counter, "duration", msg.time, "velocity", msg.velocity)
-                    note_off_start_time = time_counter // sr
-                    note_off_end_time = (time_counter + msg.time) // sr
+                    note_off_start_time = time_counter // self.sr
+                    note_off_end_time = (time_counter + msg.time) // self.sr
                     note_on_end_time = note_register[msg.note][0]
                     intensity = note_register[msg.note][1]
 					# fill in color
@@ -138,17 +147,16 @@ class MidiFile(mido.MidiFile):
                     note_on_end_time = data[0]
                     intensity = data[1]
                     # print(key, note_on_end_time)
-                    note_off_start_time = time_counter // sr
+                    note_off_start_time = time_counter // self.sr
                     roll[idx, key, note_on_end_time:] = intensity
                 note_register[idx] = -1
 
         return roll
 
     def get_roll_image(self):
-        roll = self.get_roll()
         plt.ioff()
 
-        K = 16
+        K = self.nchannel
 
         transparent = colorConverter.to_rgba('black')
         colors = [mpl.colors.to_rgba(mpl.colors.hsv_to_rgb((i / K, 1, 1)), alpha=1) for i in range(K)]
@@ -171,7 +179,7 @@ class MidiFile(mido.MidiFile):
 
         for i in range(K):
             try:
-                img = a1.imshow(roll[i], interpolation='nearest', cmap=cmaps[i], aspect='auto')
+                img = a1.imshow(self.roll[i], interpolation='nearest', cmap=cmaps[i], aspect='auto')
                 array.append(img.get_array())
             except IndexError:
                 pass
@@ -211,7 +219,7 @@ class MidiFile(mido.MidiFile):
             )
 
         # change scale and label of y axis
-        plt.yticks([y*16 for y in range(8)], [y*16 for y in range(8)])
+        plt.yticks([y*self.nchannel for y in range(8)], [y*self.nchannel for y in range(8)])
         ax.set_xlabel("time [s]")
         if xlim!=None:
             ticks_per_sec=x_label_interval/x_label_period_sec
@@ -224,11 +232,11 @@ class MidiFile(mido.MidiFile):
         return fig, ax
 
     def draw_roll(self, figsize = (15,9), xlim=None, ylim=None, colorbar=False):
-        roll = self.get_roll()
+        #roll = self.get_roll()
         fig, a1=self._grp_init(figsize=figsize, xlim=xlim, ylim=ylim)
 
         # build colors
-        channel_nb = 16
+        channel_nb = self.nchannel
         transparent = colorConverter.to_rgba('black')
         colors = [
             mpl.colors.to_rgba(mpl.colors.hsv_to_rgb((i / channel_nb, 1, 1)), alpha=1) 
@@ -251,14 +259,14 @@ class MidiFile(mido.MidiFile):
         # draw piano roll and stack image on a1
         for i in range(channel_nb):
             try:
-                a1.imshow(roll[i], origin="lower", interpolation='nearest', cmap=cmaps[i], aspect='auto')
+                a1.imshow(self.roll[i], origin="lower", interpolation='nearest', cmap=cmaps[i], aspect='auto')
             except IndexError:
                 pass
 
         # draw color bar
         if colorbar:
             colors = [mpl.colors.hsv_to_rgb((i / channel_nb, 1, 1)) for i in range(channel_nb)]
-            cmap = mpl.colors.LinearSegmentedColormap.from_list('my_cmap', colors, 16)
+            cmap = mpl.colors.LinearSegmentedColormap.from_list('my_cmap', colors, self.nchannel)
             a2 = fig.add_axes([0.1, 0.9, 0.8, 0.05])
             cbar = mpl.colorbar.ColorbarBase(a2, cmap=cmap,
                                         orientation='horizontal',
@@ -269,19 +277,6 @@ class MidiFile(mido.MidiFile):
         plt.savefig("outputs/"+self.filename+".png", bbox_inches="tight")
         plt.show(block=True)
 
-    def get_tempo(self):
-        try:
-            return self.meta["set_tempo"]["tempo"]
-        except:
-            return 500000
-
-    def get_total_ticks(self):
-        max_ticks = 0
-        for channel in range(16):
-            ticks = sum(msg.time for msg in self.events[channel])
-            if ticks > max_ticks:
-                max_ticks = ticks
-        return max_ticks
 
 
 if __name__ == "__main__":
@@ -291,11 +286,8 @@ if __name__ == "__main__":
     path="{0}/{1}/{1}.mid".format(dir,target)
     mid = MidiFile(path)
 
-    # get the list of all events
     # events = mid.get_events()
-
-    # get the np array of piano roll image
-    roll = mid.get_roll(verbose=False)
+    # roll = mid.get_roll(verbose=False)
 
     # draw piano roll by pyplot
     mid.draw_roll(figsize=(18,6),xlim=[2,15],ylim=[44,92],colorbar=False)
