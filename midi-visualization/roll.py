@@ -1,4 +1,4 @@
-import mido
+cdimport mido
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -75,7 +75,7 @@ class MidiFile(mido.MidiFile):
 
         roll = np.zeros((self.nchannel, 128, length // self.sr), dtype="int8")
         note_register = [int(-1) for x in range(128)]   # array for the state (on/off) of each key
-        timbre_register = [1 for x in range(16)]        # array for the state (program_change) of each channel
+        timbre_register = [1 for x in range(self.nchannel)]        # array for the state (program_change) of each channel
 
         for idx, channel in enumerate(events):
             time_counter = 0
@@ -88,58 +88,51 @@ class MidiFile(mido.MidiFile):
 
             for msg in channel:
                 if msg.type == "control_change":
-                    if msg.control == 7:
-                        volume = msg.value
-                        # directly assign volume
-                    if msg.control == 11:
-                        volume = volume * msg.value // 127
-                        # change volume by percentage
-                    # print("cc", msg.control, msg.value, "duration", msg.time)
+                    #if msg.control == 7: # Main Volume [0,127]
+                    if msg.is_cc(7): # Main Volume
+                        volume = msg.value # [0, 127]
+                    
+                    #if msg.control == 11: # Expression Controller
+                    if msg.is_cc(11): # Expression Controller [0,127]
+                        volume = volume * msg.value // 127 # volume[0,127] x expression[0,100](%)
 
                 if msg.type == "program_change":
                     timbre_register[idx] = msg.program
                     if verbose:
                         print("channel", idx, "pc", msg.program, "time", time_counter, "duration", msg.time)
 
-
                 if msg.type == "note_on":
                     if verbose:
                         print("on ", msg.note, "time", time_counter, "duration", msg.time, "velocity", msg.velocity)
-                    note_on_start_time = time_counter // self.sr
+                    
+                    # note_on_start_time = time_counter // self.sr
                     note_on_end_time = (time_counter + msg.time) // self.sr
                     intensity = volume * msg.velocity // 127
 
-					# When a note_on event *ends* the note start to be play 
-					# Record end time of note_on event if there is no value in register
-					# When note_off event happens, we fill in the color
-                    if note_register[msg.note] == -1:
-                        note_register[msg.note] = (note_on_end_time,intensity)
-                    else:
-					# When note_on event happens again, we also fill in the color
-                        old_end_time = note_register[msg.note][0]
-                        old_intensity = note_register[msg.note][1]
-                        roll[idx, msg.note, old_end_time: note_on_end_time] = old_intensity
-                        note_register[msg.note] = (note_on_end_time,intensity)
+                    if note_register[msg.note] != -1: # first sound for each note
+                        last_end_time = note_register[msg.note][0]  # note_on end time of last note
+                        last_intensity = note_register[msg.note][1] # intensity of last note 
+                        
+                        roll[ idx, msg.note, last_end_time:note_on_end_time ] = last_intensity
 
+                    note_register[msg.note] = (note_on_end_time, intensity)
 
                 if msg.type == "note_off":
                     if verbose:
                         print("off", msg.note, "time", time_counter, "duration", msg.time, "velocity", msg.velocity)
-                    note_off_start_time = time_counter // self.sr
+                    
+                    # note_off_start_time = time_counter // self.sr
                     note_off_end_time = (time_counter + msg.time) // self.sr
-                    note_on_end_time = note_register[msg.note][0]
-                    intensity = note_register[msg.note][1]
-					# fill in color
-                    roll[idx, msg.note, note_on_end_time:note_off_end_time] = intensity
+                    
+                    last_end_time = note_register[msg.note][0] # note_on end time of last note
+                    last_intensity = note_register[msg.note][1] # intensity of last note 
+					
+                    # fill in color
+                    roll[ idx, msg.note, last_end_time:note_off_end_time ] = last_intensity
 
                     note_register[msg.note] = -1  # reinitialize register
 
                 time_counter += msg.time
-
-                # TODO : velocity -> done, but not verified
-                # TODO: Pitch wheel
-                # TODO: Channel - > Program Changed / Timbre catagory
-                # TODO: real time scale of roll
 
             # if there is a note not closed at the end of a channel, close it
             for key, data in enumerate(note_register):
