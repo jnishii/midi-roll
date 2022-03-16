@@ -1,4 +1,4 @@
-cdimport mido
+import mido
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -273,7 +273,7 @@ class MidiFile(mido.MidiFile):
 
 
 if __name__ == "__main__":
-    dir="../data/pedb2_v0.0.1.b/"
+    dir="data/pedb2_v0.0.1.b/"
     #target="bac-inv001-o-p2"
     target="bac-wtc101-p-a-p1"
     path="{0}/{1}/{1}.mid".format(dir,target)
