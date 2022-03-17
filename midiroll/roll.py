@@ -13,7 +13,7 @@ class MidiFile(mido.MidiFile):
     def __init__(self, midifile, verbose=False):
         self.sr = 10   # down sampling rate from MIDI to time axis
         self.meta = {}
-        self.nch = 16
+        self.max_nch = 16
 
         print("Filename: ", midifile)
         mido.MidiFile.__init__(self, midifile)
@@ -48,7 +48,8 @@ class MidiFile(mido.MidiFile):
         if verbose:
             print(self)
 
-        events = [[] for x in range(self.nch)]
+        events = [[]]*self.max_nch
+        self.nch=0
 
         # Iterate all event in the midi and extract to 16 channel form
         for track in self.tracks:
@@ -56,6 +57,7 @@ class MidiFile(mido.MidiFile):
                 try:
                     channel = msg.channel
                     events[channel].append(msg)
+                    self.nch=channel+1
                 except AttributeError:
                     try:
                         if type(msg) != type(mido.UnknownMetaMessage):
@@ -64,7 +66,7 @@ class MidiFile(mido.MidiFile):
                             pass
                     except:
                         print("error", type(msg))
-
+        
         return events
 
     def get_roll(self, events, verbose=False):
@@ -247,11 +249,11 @@ class MidiFile(mido.MidiFile):
             cbar = mpl.colorbar.ColorbarBase(ax2, cmap=cmap,
                                              orientation='horizontal',
                                              ticks=list(range(self.nch)))
-        ax1.set_title(self.fpath.name)
-        plt.draw()
-        plt.ion()
-        plt.savefig("outputs/"+self.fpath.name+".png", bbox_inches="tight")
-        plt.show(block=True)
+        # ax1.set_title(self.fpath.name)
+        # plt.draw()
+        # plt.ion()
+        # plt.savefig("outputs/"+self.fpath.name+".png", bbox_inches="tight")
+        # plt.show(block=True)
 
 
 def main():
