@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "midi-visualization"
+name = "midi-roll"
 version = "0.1.0"
 description = "Vsualize MIDI file"
 authors = ["jnishii <nishii@yamaguchi-u.ac.jp>"]

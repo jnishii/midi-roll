@@ -3,7 +3,7 @@ A revised version of python package for midi-visualization, originally distribut
 
 ## Updates from original version
 
-I added some arguments to functions, and some minor corrections for the code.
+I added some arguments to functions, and many corrections for the code.
 
 - `mid.get_roll()`
     - `verbose=False`
@@ -25,3 +25,7 @@ mid = MidiFile("some_good_music.mid") # set file path
 roll = mid.get_roll(verbose=False)
 mid.draw_roll(figsize=(18,6),xlim=[0,10],colorbar=False)
 ```
+
+## Links
+
+- [](https://hjp.hatenablog.com/entry/2021/03/01/213026)
