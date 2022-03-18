@@ -46,3 +46,5 @@ poetry/core/*
 *.png
 pedb2_v0.0.1.b
 *~
+.DS_Store
+*.lock

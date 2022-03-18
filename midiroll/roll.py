@@ -39,25 +39,24 @@ class MidiFile(mido.MidiFile):
 
     def get_events(self, verbose=False):
         """
-        Extract self.nch (default: 16) channel data from MIDI and return a list.
+        Extract self.max_nch (default: 16) channel data from MIDI and return a list.
         Lyrics and meta data used in extra channels are not include in the list.
 
         Returns:
-            list : [[ch1],[ch2]....[ch16]]
+            list : [[ch1],[ch2]....[ch16]] # Note that empty channel is removed!
         """
         if verbose:
             print(self)
 
-        events = [[]]*self.max_nch
-        self.nch=0
-
-        # Iterate all event in the midi and extract to 16 channel form
-        for track in self.tracks:
+        mid = self
+        events =  [[] for i in range(self.max_nch)]
+        print("# of tracks: ", len(mid.tracks))        
+        
+        for track in mid.tracks:
             for msg in track:
                 try:
                     channel = msg.channel
                     events[channel].append(msg)
-                    self.nch=channel+1
                 except AttributeError:
                     try:
                         if type(msg) != type(mido.UnknownMetaMessage):
@@ -66,7 +65,9 @@ class MidiFile(mido.MidiFile):
                             pass
                     except:
                         print("error", type(msg))
-        
+        events = list(filter(None, events)) # remove emtpy channel
+        self.nch = len(events)
+
         return events
 
     def get_roll(self, events, verbose=False):
@@ -79,6 +80,7 @@ class MidiFile(mido.MidiFile):
             (self.nch, 128, length_ticks // self.sr), dtype="int8")
         register_note = [int(-1)]*128         # register the state (on/off) of each key
         register_timbre = np.ones(self.nch)  # register the state (program_change) of each channel
+
         for idx, channel in enumerate(events):
             time_counter = 0
             volume = 100
@@ -144,7 +146,7 @@ class MidiFile(mido.MidiFile):
 
         return roll
 
-    def _grp_init(self, figsize=(15, 9), xlim=None, ylim=None, bgcolor='black'):
+    def _grp_init(self, figsize=(15, 9), xlim=None, ylim=None, bgcolor=bgcolor):
         """
         Display basic information and initialize graphics. 
         Called by draw_roll()
@@ -156,7 +158,7 @@ class MidiFile(mido.MidiFile):
             length_ticks, self.ticks_per_beat, self.get_tempo())
         ticks_per_sec = length_ticks/length_seconds
 
-        print("# of channels: ", self.nch)
+        print("# of active channels: ", self.nch)
         print("Tick length: {} [ticks]".format(length_ticks))
         print("Time length: {} [s]".format(length_seconds))
         print("ticks/beat: ", self.ticks_per_beat)
@@ -184,8 +186,7 @@ class MidiFile(mido.MidiFile):
             [int(x * xticks_interval) for x in range(nxticks)],
             [round(x * xticks_interval_sec, 2) for x in range(nxticks)]
         )
-        plt.yticks([y*self.nch for y in range(8)],
-                   [y*self.nch for y in range(8)])
+        plt.yticks([y*16 for y in range(8)], [y*16 for y in range(8)])
 
         ax.set_xlabel("time [s]")
         ax.set_ylabel("note")
@@ -198,9 +199,9 @@ class MidiFile(mido.MidiFile):
             ax.set_ylim(ylim)
 
         return fig, ax
-
-    def draw_roll(self, figsize=(15, 9), xlim=None, ylim=None, bgcolor='black', colorbar=False):
-        # define color maps
+    
+    def _get_color_maps(self, bgcolor='black'):
+        """ Define color map for each channel """
         transparent = colorConverter.to_rgba(bgcolor)
         colors = [
             mpl.colors.to_rgba(mpl.colors.hsv_to_rgb(
@@ -214,7 +215,7 @@ class MidiFile(mido.MidiFile):
         ]
 
         """
-        make look up table (LUT) data like (K=3)
+        make look up table (LUT) data, e.g., (K=3)
             array([[0. , 0. , 0. , 0. ],
                 [0.5, 0. , 0. , 0.2],
                 [1. , 0. , 0. , 0.4],
@@ -227,13 +228,17 @@ class MidiFile(mido.MidiFile):
         """
         for i in range(self.nch):
             cmaps[i]._init()
-            # create look up table (_lut array) with rgba values
-            # 3 extra rows are necessary (see the example above)
-            alphas = np.linspace(0, 1, cmaps[i].N + 3)
+            alphas = np.linspace(0, 1, cmaps[i].N + 3) # about 3 extra rows, see the example above
             cmaps[i]._lut[:, -1] = alphas
 
-        # create and stack piano roll image on ax1
+        return colors, cmaps   
+
+    def draw_roll(self, figsize=(15, 9), xlim=None, ylim=None, bgcolor='black', colorbar=False):
+        """ create and stack piano roll image on ax1 """
+
         fig, ax1 = self._grp_init(figsize=figsize, xlim=xlim, ylim=ylim, bgcolor=bgcolor)
+        colors, cmaps = self._get_color_maps(bgcolor=bgcolor)
+
         for i in range(self.nch):
             try:
                 ax1.imshow(self.roll[i], origin="lower",
@@ -249,11 +254,11 @@ class MidiFile(mido.MidiFile):
             cbar = mpl.colorbar.ColorbarBase(ax2, cmap=cmap,
                                              orientation='horizontal',
                                              ticks=list(range(self.nch)))
-        # ax1.set_title(self.fpath.name)
-        # plt.draw()
-        # plt.ion()
-        # plt.savefig("outputs/"+self.fpath.name+".png", bbox_inches="tight")
-        # plt.show(block=True)
+        ax1.set_title(self.fpath.name)
+        plt.draw()
+        plt.ion()
+        plt.savefig("outputs/"+self.fpath.name+".png", bbox_inches="tight")
+        plt.show(block=True)
 
 
 def main():
