@@ -81,6 +81,8 @@ class MidiFile(mido.MidiFile):
         register_note = [int(-1)]*128         # register the state (on/off) of each key
         register_timbre = np.ones(self.nch)  # register the state (program_change) of each channel
 
+        self.intensity_range = [100,0] # [min, max]
+        self.note_range = [127,0] # [min, max]
         for idx, channel in enumerate(events):
             time_counter = 0
             volume = 100
@@ -91,10 +93,10 @@ class MidiFile(mido.MidiFile):
             for msg in channel:
                 if msg.type == "control_change":
                     if msg.is_cc(7):  # if msg.control == 7: Main Volume
-                        volume = msg.value //127  # [0, 127]
-
+                        volume = 100*msg.value //127  # [0, 100]
+             
                     if msg.is_cc(11):  # if msg.control == 11: Expression Controller
-                        # volume[0,127] x expression[0,127]/127
+                        # volume[0,100] x expression[0,127]/127
                         volume *= msg.value // 127
 
                 if msg.type == "program_change":
@@ -111,6 +113,11 @@ class MidiFile(mido.MidiFile):
                     # note_on_start_time = time_counter // self.sr
                     note_on_end_time = (time_counter + msg.time) // self.sr
                     intensity = volume * msg.velocity // 127
+                    
+                    if self.intensity_range[0] > intensity: # update minimum intensity
+                        self.intensity_range[0] = intensity
+                    if self.intensity_range[1] < intensity: # update maximum intensity
+                        self.intensity_range[1] = intensity
 
                     if register_note[msg.note] != -1:  # not after note_off
                         last_end_time, last_intensity = register_note[msg.note]
@@ -118,6 +125,11 @@ class MidiFile(mido.MidiFile):
                              last_end_time:note_on_end_time] = last_intensity
 
                     register_note[msg.note] = (note_on_end_time, intensity)
+
+                    if self.note_range[0] > msg.note: # update minimum note
+                        self.note_range[0] = msg.note
+                    if  self.note_range[1] < msg.note: # update maximum note
+                        self.note_range[1] = msg.note
 
                 if msg.type == "note_off":
                     if verbose:
@@ -159,6 +171,8 @@ class MidiFile(mido.MidiFile):
         ticks_per_sec = length_ticks/length_seconds
 
         print("# of active channels: ", self.nch)
+        print("intensity range [0, 100]: ", self.intensity_range)
+        print("note range [0, 127]: ", self.note_range)
         print("Tick length: {} [ticks]".format(length_ticks))
         print("Time length: {} [s]".format(length_seconds))
         print("ticks/beat: ", self.ticks_per_beat)
@@ -236,24 +250,27 @@ class MidiFile(mido.MidiFile):
     def draw_roll(self, figsize=(15, 9), xlim=None, ylim=None, bgcolor='black', colorbar=False):
         """ create and stack piano roll image on ax1 """
 
-        fig, ax1 = self._grp_init(figsize=figsize, xlim=xlim, ylim=ylim, bgcolor=bgcolor)
+        fig, ax1 = self._grp_init(
+            figsize=figsize, xlim=xlim, ylim=ylim, bgcolor=bgcolor)
         colors, cmaps = self._get_color_maps(bgcolor=bgcolor)
 
         for i in range(self.nch):
             try:
-                ax1.imshow(self.roll[i], origin="lower",
+                im=ax1.imshow(self.roll[i], origin="lower",
                           interpolation='nearest', cmap=cmaps[i], aspect='auto')
+                if colorbar:
+                    fig.colorbar(im)
             except IndexError:
                 pass
 
-        # draw color bar
-        if colorbar:
-            cmap = mpl.colors.LinearSegmentedColormap.from_list(
-                'my_cmap', colors, self.nch)
-            ax2 = fig.add_axes([0.1, 0.9, 0.8, 0.05])
-            cbar = mpl.colorbar.ColorbarBase(ax2, cmap=cmap,
-                                             orientation='horizontal',
-                                             ticks=list(range(self.nch)))
+        # draw color bar for channel color
+        # if colorbar:
+        #     cmap = mpl.colors.LinearSegmentedColormap.from_list(
+        #         'my_cmap', colors, self.nch)
+        #     ax2 = fig.add_axes([0.1, 0.9, 0.8, 0.05])
+        #     cbar = mpl.colorbar.ColorbarBase(ax2, cmap=cmap,
+        #                                      orientation='horizontal',
+        #                                      ticks=list(range(self.nch)))
         ax1.set_title(self.fpath.name)
         plt.draw()
         plt.ion()
@@ -271,7 +288,7 @@ def main():
     # events = mid.get_events()
     # roll = mid.get_roll(verbose=False)
 
-    mid.draw_roll(figsize=(18, 6), xlim=[2, 15], ylim=[44, 92], bgcolor='black', colorbar=False)
+    mid.draw_roll(figsize=(18, 6), xlim=[2, 15], ylim=[44, 92], bgcolor='white', colorbar=False)
     #mid.draw_roll(figsize=(18,6), colorbar=False)
 
 
