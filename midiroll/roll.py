@@ -204,29 +204,35 @@ class MidiFile(mido.MidiFile):
 
         ax.set_xlabel("time [s]")
         ax.set_ylabel("note")
+        xlim_ticks=[0,length_ticks-1]
         if xlim != None:
             ticks_per_sec = xticks_interval/xticks_interval_sec
             print("ticks/second 2:", ticks_per_sec)
-            ax.set_xlim(np.array(xlim)*ticks_per_sec)
+            xlim_ticks=np.array(xlim)*ticks_per_sec
+            ax.set_xlim(xlim_ticks)
 
         if ylim != None:
             ax.set_ylim(ylim)
 
-        return fig, ax
+        return fig, ax, xlim_ticks
     
-    def _get_color_maps(self, bgcolor='black'):
+    def _get_color_maps(self, cmap_list=None, bgcolor='black'):
         """ Define color map for each channel """
-        transparent = colorConverter.to_rgba(bgcolor)
-        colors = [
-            mpl.colors.to_rgba(mpl.colors.hsv_to_rgb(
-                (i / self.nch, 1, 1)), alpha=1)
-            for i in range(self.nch)
-        ]
-        cmaps = [
-            mpl.colors.LinearSegmentedColormap.from_list(
-                'my_cmap', [transparent, colors[i]], 128)
-            for i in range(self.nch)
-        ]
+        if cmap_list==None:
+            transparent = colorConverter.to_rgba(bgcolor)
+            colors = [
+                mpl.colors.to_rgba(mpl.colors.hsv_to_rgb(
+                    (i / self.nch, 1, 1)), alpha=1)
+                for i in range(self.nch)
+            ]
+            cmaps = [
+                mpl.colors.LinearSegmentedColormap.from_list(
+                    'my_cmap', [transparent, colors[i]], 128)
+                for i in range(self.nch)
+            ]
+        else:
+            cmap = plt.cm.get_cmap(cmap_list)
+            cmaps = [ cmap for i in range(self.nch) ]
 
         """
         make look up table (LUT) data, e.g., (K=3)
@@ -245,19 +251,25 @@ class MidiFile(mido.MidiFile):
             alphas = np.linspace(0, 1, cmaps[i].N + 3) # about 3 extra rows, see the example above
             cmaps[i]._lut[:, -1] = alphas
 
-        return colors, cmaps   
+        return cmaps   
 
-    def draw_roll(self, figsize=(15, 9), xlim=None, ylim=None, bgcolor='black', colorbar=False):
+    def draw_roll(self, figsize=(15, 9), xlim=None, ylim=None, cmap_list=None, bgcolor='black', colorbar=False):
         """ create and stack piano roll image on ax1 """
 
-        fig, ax1 = self._grp_init(
+        fig, ax1, xlim_ticks = self._grp_init(
             figsize=figsize, xlim=xlim, ylim=ylim, bgcolor=bgcolor)
-        colors, cmaps = self._get_color_maps(bgcolor=bgcolor)
+        cmaps = self._get_color_maps(cmap_list=cmap_list, bgcolor=bgcolor)
 
         for i in range(self.nch):
             try:
-                im=ax1.imshow(self.roll[i], origin="lower",
-                          interpolation='nearest', cmap=cmaps[i], aspect='auto')
+                print("xlim_ticks", xlim_ticks)
+                target_roll = self.roll[i, :, :int(xlim_ticks[1])]
+                #target_roll = self.roll[i, :, :]
+
+                max_intensity = np.max(np.array(target_roll))
+                print("max_intensity:",max_intensity)
+                im = ax1.imshow(self.roll[i], origin="lower",
+                                interpolation='nearest', cmap=cmaps[i], aspect='auto', clim=[0, max_intensity])
                 if colorbar:
                     fig.colorbar(im)
             except IndexError:
@@ -288,9 +300,10 @@ def main():
     # events = mid.get_events()
     # roll = mid.get_roll(verbose=False)
 
-    mid.draw_roll(figsize=(18, 6), xlim=[2, 15], ylim=[44, 92], bgcolor='white', colorbar=False)
-    #mid.draw_roll(figsize=(18,6), colorbar=False)
-
+    # cmap_list: colormap name
+    # https://matplotlib.org/stable/tutorials/colors/colormaps.html
+    #mid.draw_roll(figsize=(18, 6), xlim=[2, 15], ylim=[44, 92], cmap_list='Purples', bgcolor='white', colorbar=True)
+    mid.draw_roll(figsize=(20, 4), xlim=None, ylim=[30,92], cmap_list='Purples', bgcolor='white', colorbar=None)
 
 if __name__ == "__main__":
     main()
