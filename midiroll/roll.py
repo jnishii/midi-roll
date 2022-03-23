@@ -1,9 +1,16 @@
-from turtle import bgcolor
+import streamlit as st
+import librosa
+import librosa.display
+import os
 import mido
 import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib as mpl
+import matplotlib.pyplot as plt
 from matplotlib.colors import colorConverter
+import plotly.graph_objects as go
+import plotly.express as px
+
+from turtle import bgcolor
 import re
 from pathlib import Path
 
@@ -50,7 +57,6 @@ class MidiFile(mido.MidiFile):
 
         mid = self
         events =  [[] for i in range(self.max_nch)]
-        print("# of tracks: ", len(mid.tracks))        
         
         for track in mid.tracks:
             for msg in track:
@@ -169,13 +175,18 @@ class MidiFile(mido.MidiFile):
             length_ticks, self.ticks_per_beat, self.get_tempo())
         ticks_per_sec = length_ticks/length_seconds
 
-        print("# of active channels: ", self.nch)
-        print("intensity range [0, 100]: ", self.intensity_range)
-        print("note range [0, 127]: ", self.note_range)
-        print("Tick length: {} [ticks]".format(length_ticks))
-        print("Time length: {} [s]".format(length_seconds))
-        print("ticks/beat: ", self.ticks_per_beat)
-        print("ticks/second: ", ticks_per_sec)
+        st.sidebar.write('## midi file')
+
+        st.sidebar.write("Num. of tracks: ", len(self.tracks))
+        st.sidebar.write("Num. of active channels: ", self.nch)
+        st.sidebar.write("intensity range [0, 100]: [{}, {}]".format(self.intensity_range[0], self.intensity_range[1]))
+        st.sidebar.write("note range [0, 127]: [{}, {}]".format(self.note_range[0], self.note_range[1]))
+        st.sidebar.write("ticks/beat: ", self.ticks_per_beat)
+        st.sidebar.write("ticks/second: ", ticks_per_sec)
+        st.sidebar.write("Tick length: [ticks]", length_ticks)
+        st.sidebar.write("Time length [s]: ", length_seconds)
+   
+        xlim=st.sidebar.slider('Time range: ', min_value=0, max_value=int(length_seconds), value=(0,int(length_seconds)))
 
         # Initialize graphics
         plt.rcParams["font.size"] = 20
@@ -201,6 +212,9 @@ class MidiFile(mido.MidiFile):
         )
         plt.yticks([y*16 for y in range(8)], [y*16 for y in range(8)])
 
+        ax.set_xlabel("time [s]")
+        ax.set_ylabel("note")
+        xlim_ticks=[0,length_ticks-1]
         if xlim != None:
             ticks_per_sec = xticks_interval/xticks_interval_sec
             print("ticks/second 2:", ticks_per_sec)
@@ -216,21 +230,27 @@ class MidiFile(mido.MidiFile):
         ax.set_xlabel("time [s]")
         ax.set_ylabel("note")
         
-        return fig, ax
+        #return fig, ax
+        return fig, ax, xlim_ticks
+
     
-    def _get_color_maps(self, bgcolor='black'):
+    def _get_color_maps(self, cmap_list=None, bgcolor='black'):
         """ Define color map for each channel """
-        transparent = colorConverter.to_rgba(bgcolor)
-        colors = [
-            mpl.colors.to_rgba(mpl.colors.hsv_to_rgb(
-                (i / self.nch, 1, 1)), alpha=1)
-            for i in range(self.nch)
-        ]
-        cmaps = [
-            mpl.colors.LinearSegmentedColormap.from_list(
-                'my_cmap', [transparent, colors[i]], 128)
-            for i in range(self.nch)
-        ]
+        if cmap_list==None:
+            transparent = colorConverter.to_rgba(bgcolor)
+            colors = [
+                mpl.colors.to_rgba(mpl.colors.hsv_to_rgb(
+                    (i / self.nch, 1, 1)), alpha=1)
+                for i in range(self.nch)
+            ]
+            cmaps = [
+                mpl.colors.LinearSegmentedColormap.from_list(
+                    'my_cmap', [transparent, colors[i]], 128)
+                for i in range(self.nch)
+            ]
+        else:
+            cmap = plt.cm.get_cmap(cmap_list)
+            cmaps = [ cmap for i in range(self.nch) ]
 
         """
         make look up table (LUT) data, e.g., (K=3)
@@ -249,9 +269,9 @@ class MidiFile(mido.MidiFile):
             alphas = np.linspace(0, 1, cmaps[i].N + 3) # about 3 extra rows, see the example above
             cmaps[i]._lut[:, -1] = alphas
 
-        return colors, cmaps   
+        return cmaps   
 
-    def draw_roll(self, figsize=(15, 9), xlim=None, ylim=None, bgcolor='black', colorbar=False):
+    def draw_roll(self, figsize=(15, 9), xlim=None, ylim=None, cmap_list=None, bgcolor='black', colorbar=False):
         """Create piano roll image.
 
         Args:
@@ -271,19 +291,21 @@ class MidiFile(mido.MidiFile):
             colorbar (boolean): enable colorbar of intensity
         """
 
-        fig, ax1 = self._grp_init(
+        fig, ax1, xlim_ticks = self._grp_init(
             figsize=figsize, xlim=xlim, ylim=ylim, bgcolor=bgcolor)
-        colors, cmaps = self._get_color_maps(bgcolor=bgcolor)
+        cmaps = self._get_color_maps(cmap_list=cmap_list, bgcolor=bgcolor)
 
         for i in range(self.nch):
             try:
-                """
-                # extract intensity range in the interval of xlim
-                intensity_range=[]
-                plt.clim(intensity_range)
-                """
-                im=ax1.imshow(self.roll[i], origin="lower",
-                          interpolation='nearest', cmap=cmaps[i], aspect='auto')
+                print("xlim_ticks", xlim_ticks)
+                target_roll = self.roll[i, :, :int(xlim_ticks[1])]
+                #target_roll = self.roll[i, :, :]
+
+                max_intensity = np.max(np.array(target_roll))
+                print("max_intensity:",max_intensity)
+                im = ax1.imshow(self.roll[i], origin="lower",
+                               interpolation='nearest', cmap=cmaps[i], aspect='auto', clim=[0, max_intensity])                
+                
                 if colorbar:
                     fig.colorbar(im)
             except IndexError:
@@ -297,28 +319,55 @@ class MidiFile(mido.MidiFile):
         #     cbar = mpl.colorbar.ColorbarBase(ax2, cmap=cmap,
         #                                      orientation='horizontal',
         #                                      ticks=list(range(self.nch)))
+        
         ax1.set_title(self.fpath.name)
         plt.draw()
         plt.ion()
+        with st.container():
+            st.pyplot(fig)
         plt.savefig("outputs/"+self.fpath.name+".png", bbox_inches="tight")
-        plt.show(block=True)
+        #plt.show(block=True)
 
+def getfiles(folder_path):
+    files = [f for f in os.listdir(folder_path)] # if f.endswith('.mid)]
+    return (files)
+
+def file_selector(folder_path):
+    filenames = os.listdir(folder_path)
+    selected_filename = st.selectbox('Select a file', filenames)
+    return os.path.join(folder_path, selected_filename)
+
+def show_wav(file):
+    wav,sr = librosa.load(file)
+    wav_seconds=int(len(wav)/sr)
+    st.sidebar.write('## audio file')
+    st.sidebar.write('sampling rate [Hz]: ', sr)
+    st.audio(file)
 
 def main():
     dir = "data/pedb2_v0.0.1.b/"
     #target="bac-inv001-o-p2"
     target = "bac-wtc101-p-a-p1"
-    path = "{0}/{1}/{1}.mid".format(dir, target)
-    mid = MidiFile(path)
+
+    st.set_page_config(layout='wide')
+
+    files = getfiles(dir)
+    target = st.sidebar.selectbox('Select file to visualize', files)
+
+    path_wav = "{0}/{1}/{1}.wav".format(dir, target)
+    show_wav(path_wav)
+
+
+    path_mid = "{0}/{1}/{1}.mid".format(dir, target)
+    mid = MidiFile(path_mid)
 
     # events = mid.get_events()
     # roll = mid.get_roll(verbose=False)
 
-    #mid.draw_roll(figsize=(18, 6), xlim=[2, 15], ylim=[44, 92], bgcolor='white', colorbar=True)
-    mid.draw_roll(figsize=(20, 6), xlim=[2, 15], ylim="auto", bgcolor='white', colorbar=True)
-
-    #mid.draw_roll(figsize=(18,6), colorbar=False)
-
+    # cmap_list: colormap name
+    # https://matplotlib.org/stable/tutorials/colors/colormaps.html
+    #mid.draw_roll(figsize=(18, 6), xlim=[2, 15], ylim=[44, 92], cmap_list='Purples', bgcolor='white', colorbar=True)
+    mid.draw_roll(figsize=(20, 4), xlim=None, ylim=[30,92], cmap_list='Purples', bgcolor='white', colorbar=None)
 
 if __name__ == "__main__":
     main()
