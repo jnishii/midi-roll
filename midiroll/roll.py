@@ -151,8 +151,7 @@ class MidiFile(mido.MidiFile):
                 if data != -1:
                     note_on_end_time = data[0]
                     intensity = data[1]
-                    # print(key, note_on_end_time)
-                    note_off_start_time = time_counter // self.sr
+                    # note_off_start_time = time_counter // self.sr
                     roll[idx, key, note_on_end_time:] = intensity
                 register_note[idx] = -1
 
@@ -202,16 +201,21 @@ class MidiFile(mido.MidiFile):
         )
         plt.yticks([y*16 for y in range(8)], [y*16 for y in range(8)])
 
-        ax.set_xlabel("time [s]")
-        ax.set_ylabel("note")
         if xlim != None:
             ticks_per_sec = xticks_interval/xticks_interval_sec
             print("ticks/second 2:", ticks_per_sec)
-            ax.set_xlim(np.array(xlim)*ticks_per_sec)
+            xlim_ticks=np.array(xlim)*ticks_per_sec
+            ax.set_xlim(xlim_ticks)
 
-        if ylim != None:
-            ax.set_ylim(ylim)
-
+        if ylim == None:
+            ylim=[0, 127]
+        elif ylim == "Auto" or ylim == "auto":
+            ylim=[self.note_range[0]-1, self.note_range[1]+1]
+        ax.set_ylim(ylim)
+            
+        ax.set_xlabel("time [s]")
+        ax.set_ylabel("note")
+        
         return fig, ax
     
     def _get_color_maps(self, bgcolor='black'):
@@ -248,7 +252,24 @@ class MidiFile(mido.MidiFile):
         return colors, cmaps   
 
     def draw_roll(self, figsize=(15, 9), xlim=None, ylim=None, bgcolor='black', colorbar=False):
-        """ create and stack piano roll image on ax1 """
+        """Create piano roll image.
+
+        Args:
+            figsize (tuple or list): figure size
+            
+            xlim: Time range to be displayed [s]
+                None (not specified) : Full range
+                tuple or list : (xmin, xmax) [s]
+            
+            ylim: Range of notes to be displayed in vertical axis
+                None (not specified) : Full range of notes
+                "Auto" or "auto" : automatic range adjustment
+                tuple or list : range of notes to be displayed [s]
+ 
+            bgcolor (string): name of background color
+            
+            colorbar (boolean): enable colorbar of intensity
+        """
 
         fig, ax1 = self._grp_init(
             figsize=figsize, xlim=xlim, ylim=ylim, bgcolor=bgcolor)
@@ -256,6 +277,11 @@ class MidiFile(mido.MidiFile):
 
         for i in range(self.nch):
             try:
+                """
+                # extract intensity range in the interval of xlim
+                intensity_range=[]
+                plt.clim(intensity_range)
+                """
                 im=ax1.imshow(self.roll[i], origin="lower",
                           interpolation='nearest', cmap=cmaps[i], aspect='auto')
                 if colorbar:
@@ -288,7 +314,9 @@ def main():
     # events = mid.get_events()
     # roll = mid.get_roll(verbose=False)
 
-    mid.draw_roll(figsize=(18, 6), xlim=[2, 15], ylim=[44, 92], bgcolor='white', colorbar=False)
+    #mid.draw_roll(figsize=(18, 6), xlim=[2, 15], ylim=[44, 92], bgcolor='white', colorbar=True)
+    mid.draw_roll(figsize=(20, 6), xlim=[2, 15], ylim="auto", bgcolor='white', colorbar=True)
+
     #mid.draw_roll(figsize=(18,6), colorbar=False)
 
 
