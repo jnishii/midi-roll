@@ -190,7 +190,6 @@ class MidiFile(mido.MidiFile):
         Display basic information and initialize graphics. 
         Called by draw_roll()
         """
-   
         dsp_len_seconds = xlim[1]-xlim[0]   
         xticks_interval_sec = dsp_len_seconds // 10 if dsp_len_seconds > 10 else dsp_len_seconds/10
         xticks_interval = mido.second2tick(
@@ -232,7 +231,7 @@ class MidiFile(mido.MidiFile):
         
         return fig, ax, xlim_ticks
 
-    def get_color_maps(self, cmap_name=None, bgcolor='white'):
+    def get_colormap_selector(self, cmap_name=None, bgcolor='white'):
         """ Define color map for each channel """
         cmap_list=(None,'Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds',
             'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
@@ -242,6 +241,7 @@ class MidiFile(mido.MidiFile):
             default_idx=cmap_list.index(cmap_name)
         except ValueError:
             default_idx=None
+
         cmap_name=st.sidebar.selectbox('colormap', cmap_list, index=default_idx)
 
         if cmap_name==None:
@@ -322,7 +322,7 @@ class MidiFile(mido.MidiFile):
             figsize=figsize, xlim=xlim, ylim=ylim, bgcolor=bgcolor)
         
         if cmaps == None:
-            self.get_color_maps('Purple')
+            self.get_colormap_selector('Purple')
 
         for i in range(self.nch):
             try:
@@ -334,7 +334,8 @@ class MidiFile(mido.MidiFile):
                 print("max_intensity:", max_intensity)
                 im = ax1.imshow(self.roll[i], origin="lower",
                                 interpolation='nearest', cmap=cmaps[i], aspect='auto', clim=[0, max_intensity])
-
+                if vlines != None:
+                    ax1.vlines(vlines,ylim[0],ylim[1])
                 if colorbar:
                     fig.colorbar(im)
             except IndexError:
@@ -350,8 +351,8 @@ class MidiFile(mido.MidiFile):
         #                                      ticks=list(range(self.nch)))
 
         #ax1.set_title(self.fpath.name)
-        plt.draw()
-        plt.ion()
+        #plt.draw()
+        #plt.ion()
         with st.container():
             st.pyplot(fig)
         plt.savefig("outputs/"+self.fpath.name+".png", bbox_inches="tight")
@@ -359,12 +360,12 @@ class MidiFile(mido.MidiFile):
 
 def get_dirs(folder_path):
     dirs = [ f for f in os.listdir(folder_path) if os.path.isdir(folder_path+"/"+f) ]
-    return (dirs)
+    return (sorted(dirs))
 
-def file_selector(folder_path):
-    filenames = os.listdir(folder_path)
-    selected_filename = st.selectbox('Select a file', filenames)
-    return os.path.join(folder_path, selected_filename)
+# def file_selector(folder_path):
+#     filenames = os.listdir(folder_path)
+#     selected_filename = st.selectbox('Select a file', filenames)
+#     return os.path.join(folder_path, selected_filename)
 
 def show_wav(file):
     wav,sr = librosa.load(file)
@@ -381,7 +382,6 @@ def main():
     st.set_page_config(layout='wide')
 
     dirs = get_dirs(dir)
-    dirs.sort()
     target = st.sidebar.selectbox('Select file to visualize', dirs)
     
     st.write(target)
@@ -400,7 +400,7 @@ def main():
     # https://matplotlib.org/stable/tutorials/colors/colormaps.html
     default_xlim=[0,4]
     bgcolor = mid.get_bgcolor_slider(bgcolor='white')
-    cmaps = mid.get_color_maps(cmap_name='Purples',bgcolor=bgcolor)
+    cmaps = mid.get_colormap_selector(cmap_name='Purples',bgcolor=bgcolor)
     mid.draw_roll(figsize=(20, 4), xlim=None, ylim=[30,92], cmaps=cmaps, bgcolor=bgcolor, vlines=default_xlim,colorbar=None)
 
     xlim=mid.get_xlim_slider(xlim=default_xlim)
