@@ -16,26 +16,49 @@ from pathlib import Path
 
 
 class MidiFile(mido.MidiFile):
-
     def __init__(self, midifile, verbose=False):
         self.sr = 10   # down sampling rate from MIDI to time axis
         self.meta = {}
         self.max_nch = 16
+        self.intensity_range = [100,0] # [min, max] adjusted by get_roll()
+        self.note_range = [127,0] # [min, max] adjusted by get_roll()
 
-        print("Filename: ", midifile)
+        #print("Filename: ", midifile)
         mido.MidiFile.__init__(self, midifile)
         self.fpath = Path(midifile)
 
-        self.events = self.get_events(verbose)
+        
+        self.events, self.nch = self.get_events(verbose)
         self.roll = self.get_roll(self.events)
 
 
+        self.length_ticks = self.get_total_ticks()
+        self.length_seconds = mido.tick2second(
+            self.length_ticks, self.ticks_per_beat, self.get_tempo())
+        self.ticks_per_sec = self.length_ticks/self.length_seconds
+
+        st.sidebar.write('## midi file')
+
+        st.sidebar.write("Num. of tracks: ", len(self.tracks))
+        st.sidebar.write("Num. of active channels: ", self.nch)
+        st.sidebar.write("intensity range [0, 100]: [{}, {}]".format(
+            self.intensity_range[0], self.intensity_range[1]))
+        st.sidebar.write("note range [0, 127]: [{}, {}]".format(
+            self.note_range[0], self.note_range[1]))
+        st.sidebar.write("ticks/beat: ", self.ticks_per_beat)
+        st.sidebar.write("ticks/second: ", self.ticks_per_sec)
+        st.sidebar.write("Tick length: [ticks]", self.length_ticks)
+        st.sidebar.write("Time length [s]: ", self.length_seconds)
+
+
+    @st.cache
     def get_tempo(self):
         try:
             return self.meta["set_tempo"]["tempo"]
         except:
             return 500000
 
+    @st.cache
     def get_total_ticks(self):
         max_ticks = 0
         for channel in range(self.nch):
@@ -44,6 +67,7 @@ class MidiFile(mido.MidiFile):
                 max_ticks = ticks
         return max_ticks
 
+    @st.cache
     def get_events(self, verbose=False):
         """
         Extract self.max_nch (default: 16) channel data from MIDI and return a list.
@@ -72,10 +96,10 @@ class MidiFile(mido.MidiFile):
                     except:
                         print("error", type(msg))
         events = list(filter(None, events)) # remove emtpy channel
-        self.nch = len(events)
+        
+        return events, len(events)
 
-        return events
-
+    @st.cache
     def get_roll(self, events, verbose=False):
         """
         Convert event (channel) data to piano roll data
@@ -84,11 +108,9 @@ class MidiFile(mido.MidiFile):
 
         roll = np.zeros(
             (self.nch, 128, length_ticks // self.sr), dtype="int8")
-        register_note = [int(-1)]*128         # register the state (on/off) of each key
+        register_note = [int(-1)]*128        # register the state (on/off) of each key
         register_timbre = np.ones(self.nch)  # register the state (program_change) of each channel
 
-        self.intensity_range = [100,0] # [min, max]
-        self.note_range = [127,0] # [min, max]
         for idx, channel in enumerate(events):
             time_counter = 0
             volume = 100
@@ -163,30 +185,18 @@ class MidiFile(mido.MidiFile):
 
         return roll
 
-    def _grp_init(self, figsize=(15, 9), xlim=None, ylim=None, bgcolor=bgcolor):
+    def _grp_init(self, figsize=(15, 9), xlim=None, ylim=None, bgcolor='white'):
         """
         Display basic information and initialize graphics. 
         Called by draw_roll()
         """
-
-        # change unit of time axis from ticks to seconds
-        length_ticks = self.get_total_ticks()
-        length_seconds = mido.tick2second(
-            length_ticks, self.ticks_per_beat, self.get_tempo())
-        ticks_per_sec = length_ticks/length_seconds
-
-        st.sidebar.write('## midi file')
-
-        st.sidebar.write("Num. of tracks: ", len(self.tracks))
-        st.sidebar.write("Num. of active channels: ", self.nch)
-        st.sidebar.write("intensity range [0, 100]: [{}, {}]".format(self.intensity_range[0], self.intensity_range[1]))
-        st.sidebar.write("note range [0, 127]: [{}, {}]".format(self.note_range[0], self.note_range[1]))
-        st.sidebar.write("ticks/beat: ", self.ticks_per_beat)
-        st.sidebar.write("ticks/second: ", ticks_per_sec)
-        st.sidebar.write("Tick length: [ticks]", length_ticks)
-        st.sidebar.write("Time length [s]: ", length_seconds)
    
-        xlim=st.sidebar.slider('Time range: ', min_value=0, max_value=int(length_seconds), value=(0,int(length_seconds)))
+        dsp_len_seconds = xlim[1]-xlim[0]   
+        xticks_interval_sec = dsp_len_seconds // 10 if dsp_len_seconds > 10 else dsp_len_seconds/10
+        xticks_interval = mido.second2tick(
+            xticks_interval_sec, self.ticks_per_beat, self.get_tempo()) / self.sr  # [ticks/interval]
+        print("xticks_interval_sec: ", xticks_interval_sec)
+        print("xticks_interval: {} [ticks/label]".format(xticks_interval))
 
         # Initialize graphics
         plt.rcParams["font.size"] = 20
@@ -195,17 +205,7 @@ class MidiFile(mido.MidiFile):
         ax.axis("equal")
         ax.set_facecolor(bgcolor)
 
-        # set x-range and define xtick interval
-        if xlim != None:
-            length_seconds = xlim[1]-xlim[0]
-
-        xticks_interval_sec = length_seconds // 10 if length_seconds > 10 else length_seconds/10
-        xticks_interval = mido.second2tick(
-            xticks_interval_sec, self.ticks_per_beat, self.get_tempo()) / self.sr  # [ticks/interval]
-        print("xticks_interval_sec: ", xticks_interval_sec)
-        print("xticks_interval: {} [ticks/label]".format(xticks_interval))
-
-        nxticks = int(length_ticks//xticks_interval)
+        nxticks = int(self.length_ticks//xticks_interval)
         plt.xticks(
             [int(x * xticks_interval) for x in range(nxticks)],
             [round(x * xticks_interval_sec, 2) for x in range(nxticks)]
@@ -214,11 +214,11 @@ class MidiFile(mido.MidiFile):
 
         ax.set_xlabel("time [s]")
         ax.set_ylabel("note")
-        xlim_ticks=[0,length_ticks-1]
+        xlim_ticks=[0,self.length_ticks-1]
         if xlim != None:
-            ticks_per_sec = xticks_interval/xticks_interval_sec
-            print("ticks/second 2:", ticks_per_sec)
-            xlim_ticks=np.array(xlim)*ticks_per_sec
+            xticks_per_sec = xticks_interval/xticks_interval_sec
+            print("ticks/second 2:", xticks_per_sec)
+            xlim_ticks=np.array(xlim)*xticks_per_sec
             ax.set_xlim(xlim_ticks)
 
         if ylim == None:
@@ -230,13 +230,21 @@ class MidiFile(mido.MidiFile):
         ax.set_xlabel("time [s]")
         ax.set_ylabel("note")
         
-        #return fig, ax
         return fig, ax, xlim_ticks
 
-    
-    def _get_color_maps(self, cmap_list=None, bgcolor='black'):
+    def get_color_maps(self, cmap_name=None, bgcolor='white'):
         """ Define color map for each channel """
-        if cmap_list==None:
+        cmap_list=(None,'Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds',
+            'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
+            'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn')
+        
+        try:
+            default_idx=cmap_list.index(cmap_name)
+        except ValueError:
+            default_idx=None
+        cmap_name=st.sidebar.selectbox('colormap', cmap_list, index=default_idx)
+
+        if cmap_name==None:
             transparent = colorConverter.to_rgba(bgcolor)
             colors = [
                 mpl.colors.to_rgba(mpl.colors.hsv_to_rgb(
@@ -249,7 +257,7 @@ class MidiFile(mido.MidiFile):
                 for i in range(self.nch)
             ]
         else:
-            cmap = plt.cm.get_cmap(cmap_list)
+            cmap = plt.cm.get_cmap(cmap_name)
             cmaps = [ cmap for i in range(self.nch) ]
 
         """
@@ -271,7 +279,23 @@ class MidiFile(mido.MidiFile):
 
         return cmaps   
 
-    def draw_roll(self, figsize=(15, 9), xlim=None, ylim=None, cmap_list=None, bgcolor='black', colorbar=False):
+    def get_bgcolor_slider(self, bgcolor='white'):
+        bgcolors=('white','black')
+        default_idx=bgcolors.index(bgcolor)
+        bgcolor=st.sidebar.selectbox('background color', bgcolors, index=default_idx)
+        return bgcolor
+
+        
+    def get_xlim_slider(self,xlim):
+        if xlim == None:
+            xlim = [0, int(self.length_seconds)]
+
+        xlim = st.slider('Time range [s]: ', min_value=0, max_value=int(
+            self.length_seconds), value=(xlim[0], xlim[1]))
+
+        return xlim
+
+    def draw_roll(self, figsize=(15, 9), xlim=None, ylim=None, cmaps=None, bgcolor='white', vlines=None, colorbar=False):
         """Create piano roll image.
 
         Args:
@@ -291,9 +315,14 @@ class MidiFile(mido.MidiFile):
             colorbar (boolean): enable colorbar of intensity
         """
 
+        if xlim == None:
+            xlim = [0,int(self.length_seconds)]
+
         fig, ax1, xlim_ticks = self._grp_init(
             figsize=figsize, xlim=xlim, ylim=ylim, bgcolor=bgcolor)
-        cmaps = self._get_color_maps(cmap_list=cmap_list, bgcolor=bgcolor)
+        
+        if cmaps == None:
+            self.get_color_maps('Purple')
 
         for i in range(self.nch):
             try:
@@ -302,10 +331,10 @@ class MidiFile(mido.MidiFile):
                 #target_roll = self.roll[i, :, :]
 
                 max_intensity = np.max(np.array(target_roll))
-                print("max_intensity:",max_intensity)
+                print("max_intensity:", max_intensity)
                 im = ax1.imshow(self.roll[i], origin="lower",
-                               interpolation='nearest', cmap=cmaps[i], aspect='auto', clim=[0, max_intensity])                
-                
+                                interpolation='nearest', cmap=cmaps[i], aspect='auto', clim=[0, max_intensity])
+
                 if colorbar:
                     fig.colorbar(im)
             except IndexError:
@@ -319,8 +348,8 @@ class MidiFile(mido.MidiFile):
         #     cbar = mpl.colorbar.ColorbarBase(ax2, cmap=cmap,
         #                                      orientation='horizontal',
         #                                      ticks=list(range(self.nch)))
-        
-        ax1.set_title(self.fpath.name)
+
+        #ax1.set_title(self.fpath.name)
         plt.draw()
         plt.ion()
         with st.container():
@@ -328,9 +357,9 @@ class MidiFile(mido.MidiFile):
         plt.savefig("outputs/"+self.fpath.name+".png", bbox_inches="tight")
         #plt.show(block=True)
 
-def getfiles(folder_path):
-    files = [f for f in os.listdir(folder_path)] # if f.endswith('.mid)]
-    return (files)
+def get_dirs(folder_path):
+    dirs = [ f for f in os.listdir(folder_path) if os.path.isdir(folder_path+"/"+f) ]
+    return (dirs)
 
 def file_selector(folder_path):
     filenames = os.listdir(folder_path)
@@ -351,8 +380,11 @@ def main():
 
     st.set_page_config(layout='wide')
 
-    files = getfiles(dir)
-    target = st.sidebar.selectbox('Select file to visualize', files)
+    dirs = get_dirs(dir)
+    dirs.sort()
+    target = st.sidebar.selectbox('Select file to visualize', dirs)
+    
+    st.write(target)
 
     path_wav = "{0}/{1}/{1}.wav".format(dir, target)
     show_wav(path_wav)
@@ -366,8 +398,14 @@ def main():
 
     # cmap_list: colormap name
     # https://matplotlib.org/stable/tutorials/colors/colormaps.html
-    #mid.draw_roll(figsize=(18, 6), xlim=[2, 15], ylim=[44, 92], cmap_list='Purples', bgcolor='white', colorbar=True)
-    mid.draw_roll(figsize=(20, 4), xlim=None, ylim=[30,92], cmap_list='Purples', bgcolor='white', colorbar=None)
+    default_xlim=[0,4]
+    bgcolor = mid.get_bgcolor_slider(bgcolor='white')
+    cmaps = mid.get_color_maps(cmap_name='Purples',bgcolor=bgcolor)
+    mid.draw_roll(figsize=(20, 4), xlim=None, ylim=[30,92], cmaps=cmaps, bgcolor=bgcolor, vlines=default_xlim,colorbar=None)
+
+    xlim=mid.get_xlim_slider(xlim=default_xlim)
+    mid.draw_roll(figsize=(20, 4), xlim=xlim, ylim=[30,92], cmaps=cmaps, bgcolor=bgcolor, colorbar=None)
+
 
 if __name__ == "__main__":
     main()
