@@ -1,2 +1,5 @@
-README.rst: README.md
-    pandoc --from markdown --to rst README.md -o README.rst
+run:
+    streamlit run midiroll/roll.py
+    
+requirements.txt:
+    pipreqs . --force
