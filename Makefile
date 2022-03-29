@@ -1,5 +1,5 @@
 run:
-    streamlit run midiroll/roll.py
+	streamlit run midiroll/roll.py
     
 requirements.txt:
-    pipreqs . --force
+	pipreqs . --force

@@ -395,6 +395,9 @@ def main():
     path_mid = "{0}/{1}/{1}.mid".format(dir, target)
     mid = MidiFile(path_mid)
 
+    path_pdf = "{0}/{1}/{1}.pdf".format(dir, target)
+    st.sidebar.write('[PDF]({})'.format(path_pdf))
+
     # events = mid.get_events()
     # roll = mid.get_roll(verbose=False)
 
