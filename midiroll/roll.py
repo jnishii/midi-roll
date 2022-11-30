@@ -4,6 +4,7 @@ import librosa.display
 import os
 import mido
 import numpy as np
+import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.colors import colorConverter
@@ -14,6 +15,15 @@ from turtle import bgcolor
 import re
 from pathlib import Path
 
+# flat="[size=90][sup]\u266d[/sup][/size][size=0].[/size]"
+# sharp="[size=90][sup]\u266f[/sup][/size][size=0].[/size]"
+flat="\u266d"
+sharp="\u266f"
+midi_notes = range(132)
+
+note_names = ["C", "C"+sharp, "D", "E"+flat, "E",
+              "F", "F"+sharp, "G", "A"+flat, "A", "B"+flat, "B"]*11
+midi_names = dict(zip(midi_notes, note_names))
 
 class MidiFile(mido.MidiFile):
     def __init__(self, midifile, verbose=False):
@@ -25,7 +35,7 @@ class MidiFile(mido.MidiFile):
         self.fpath = Path(midifile)
         
         self.events, self.nch = self.get_events(verbose)
-        self.roll, self.note_range, self.intensity_range = self.get_roll(self.events)
+        self.roll, self.note_range, self.intensity_range = self.get_roll(self.events, verbose)
 
         self.length_ticks = self.get_total_ticks()
         self.length_seconds = mido.tick2second(
@@ -72,6 +82,7 @@ class MidiFile(mido.MidiFile):
             list : [[ch1],[ch2]....[ch16]] # Note that empty channel is removed!
         """
         if verbose:
+            print("[get_events()]")
             print(self)
 
         mid = self
@@ -109,11 +120,16 @@ class MidiFile(mido.MidiFile):
         register_note = [int(-1)]*128        # register the state (on/off) of each key
         register_timbre = np.ones(self.nch)  # register the state (program_change) of each channel
 
+        i = 0
+        cols = ["id", "type", "note", "note_name", "time_counter", "time", "velocity"]
+        df = pd.DataFrame(index=[], columns=cols) # only using to save midi data (not for processing in this file)
+
         for idx, channel in enumerate(events):
             time_counter = 0
             volume = 100
 
             if verbose:
+                print("[get_roll()]")
                 print("channel", idx, "start")
 
             for msg in channel:
@@ -132,10 +148,6 @@ class MidiFile(mido.MidiFile):
                               time_counter, "duration", msg.time)
 
                 if msg.type == "note_on":
-                    if verbose:
-                        print("on ", msg.note, "time", time_counter,
-                              "duration", msg.time, "velocity", msg.velocity)
-
                     # note_on_start_time = time_counter // self.sr
                     note_on_end_time = (time_counter + msg.time) // self.sr
                     intensity = volume * msg.velocity // 127
@@ -158,10 +170,6 @@ class MidiFile(mido.MidiFile):
                         note_range[1] = msg.note
 
                 if msg.type == "note_off":
-                    if verbose:
-                        print("off", msg.note, "time", time_counter,
-                              "duration", msg.time, "velocity", msg.velocity)
-
                     # note_off_start_time = time_counter // self.sr
                     note_off_end_time = (time_counter + msg.time) // self.sr
                     last_end_time, last_intensity = register_note[msg.note]
@@ -169,6 +177,18 @@ class MidiFile(mido.MidiFile):
                          last_end_time:note_off_end_time] = last_intensity
 
                     register_note[msg.note] = -1  # reinitialize register
+
+                if msg.type == "note_on" or msg.type == "note_off" :
+                    i+=1
+                    if verbose:
+                        print("[{}] on {} {} time {} duration {} velocity {}"
+                            .format(i, msg.note, midi_names[msg.note], time_counter, msg.time, msg.velocity))
+#                        print("on ", msg.note, midi_names[msg.note], "time", time_counter,
+#                              "duration", msg.time, "velocity", msg.velocity)
+
+                    df_new = pd.DataFrame(
+                        [[i, msg.type, msg.note, midi_names[msg.note], time_counter, msg.time, msg.velocity]], columns=cols)
+                    df=pd.concat([df, df_new])
 
                 time_counter += msg.time
 
@@ -180,6 +200,8 @@ class MidiFile(mido.MidiFile):
                     # note_off_start_time = time_counter // self.sr
                     roll[idx, key, note_on_end_time:] = intensity
                 register_note[idx] = -1
+
+            df.to_csv("outputs/midi_data.csv", index=False)
 
         return roll, note_range, intensity_range
 
@@ -393,7 +415,7 @@ def main():
     show_wav(path_wav)
 
     path_mid = "{0}/{1}/{1}.mid".format(dir, target)
-    mid = MidiFile(path_mid)
+    mid = MidiFile(path_mid,verbose=True)
 
     path_pdf = "{0}/{1}/{1}.pdf".format(dir, target)
     st.sidebar.write('[PDF]({})'.format(path_pdf))
