@@ -26,10 +26,13 @@ note_names = ["C", "C"+sharp, "D", "E"+flat, "E",
 midi_names = dict(zip(midi_notes, note_names))
 
 class MidiFile(mido.MidiFile):
-    def __init__(self, midifile, verbose=False):
+    def __init__(self, path, fname, verbose=False):
         self.sr = 10   # down sampling rate from MIDI to time axis
         self.meta = {}
         self.max_nch = 16
+
+        self.fname = fname
+        midifile = "{0}/{1}/{1}.mid".format(path, fname)
 
         mido.MidiFile.__init__(self, midifile)
         self.fpath = Path(midifile)
@@ -87,12 +90,13 @@ class MidiFile(mido.MidiFile):
 
         mid = self
         events =  [[] for i in range(self.max_nch)]
-        
+
         for track in mid.tracks:
             for msg in track:
                 try:
                     channel = msg.channel
                     events[channel].append(msg)
+                    print('msg', msg)
                 except AttributeError:
                     try:
                         if type(msg) != type(mido.UnknownMetaMessage):
@@ -102,7 +106,8 @@ class MidiFile(mido.MidiFile):
                     except:
                         print("error", type(msg))
         events = list(filter(None, events)) # remove emtpy channel
-        
+        print(self.meta)
+
         return events, len(events)
 
     @st.cache
@@ -133,6 +138,8 @@ class MidiFile(mido.MidiFile):
                 print("channel", idx, "start")
 
             for msg in channel:
+                #if msg.type=="marker":
+                #    print("Found Marker==============")
                 if msg.type == "control_change":
                     if msg.is_cc(7):  # if msg.control == 7: Main Volume
                         volume = 100*msg.value //127  # [0, 100]
@@ -201,7 +208,7 @@ class MidiFile(mido.MidiFile):
                     roll[idx, key, note_on_end_time:] = intensity
                 register_note[idx] = -1
 
-            df.to_csv("outputs/midi_data.csv", index=False)
+            df.to_csv("outputs/{}.csv".format(self.fname), index=False)
 
         return roll, note_range, intensity_range
 
@@ -414,8 +421,7 @@ def main():
     path_wav = "{0}/{1}/{1}.wav".format(dir, target)
     show_wav(path_wav)
 
-    path_mid = "{0}/{1}/{1}.mid".format(dir, target)
-    mid = MidiFile(path_mid,verbose=True)
+    mid = MidiFile(dir, target,verbose=False)
 
     path_pdf = "{0}/{1}/{1}.pdf".format(dir, target)
     st.sidebar.write('[PDF]({})'.format(path_pdf))

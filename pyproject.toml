@@ -12,6 +12,8 @@ plotly = "^5.11.0"
 streamlit = "^1.15.1"
 matplotlib = "^3.6.2"
 pandas = "^1.5.2"
+jupyter = "^1.0.0"
+jupyterlab = "^3.5.0"
 
 [tool.poetry.dev-dependencies]
 
