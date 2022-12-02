@@ -50,3 +50,4 @@ pedb2_v0.0.1.b
 *.lock
 
 outputs/
+.ipynb_checkpoints/
