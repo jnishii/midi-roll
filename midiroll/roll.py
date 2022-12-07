@@ -48,7 +48,9 @@ class MidiFile(mido.MidiFile):
             self.length_ticks, self.ticks_per_beat, self.get_tempo())
         self.ticks_per_sec = self.length_ticks / self.length_seconds  # miditicks/sec
         self.xticks_per_sec = self.ticks_per_sec / self.sr
+        self.show_basic_info_st()
 
+    def show_basic_info_st(self):
         st.sidebar.write('## midi file')
         st.sidebar.write("Num. of tracks: ", len(self.tracks))
         st.sidebar.write("Num. of active channels: ", self.nch)
@@ -60,6 +62,18 @@ class MidiFile(mido.MidiFile):
         st.sidebar.write("ticks/second: ", self.ticks_per_sec)
         st.sidebar.write("Tick length: [ticks]", self.length_ticks)
         st.sidebar.write("Time length [s]: ", self.length_seconds)
+
+    def show_basic_info(self):
+        print("Num. of tracks: ", len(self.tracks))
+        print("Num. of active channels: ", self.nch)
+        print("Intensity range [0, 100]: [{}, {}]".format(
+            self.intensity_range[0], self.intensity_range[1]))
+        print("Note range [0, 127]: [{}, {}]".format(
+            self.note_range[0], self.note_range[1]))
+        print("ticks/beat: ", self.ticks_per_beat)
+        print("ticks/second: ", self.ticks_per_sec)
+        print("Tick length: [ticks]", self.length_ticks)
+        print("Time length [s]: ", self.length_seconds)
 
     @st.cache
     def get_tempo(self):
@@ -220,8 +234,6 @@ class MidiFile(mido.MidiFile):
                     # note_off_start_time = time_counter // self.sr
                     roll[idx, key, note_on_end_time:] = intensity
                 register_note[idx] = -1
-
-
 
         return roll, note_range, intensity_range
 
