@@ -206,7 +206,6 @@ class MidiFile(mido.MidiFile):
                     df_new = pd.DataFrame(msg_dct, index=[idx])
                     df_new["time_counter"] = time_counter
                     if "note" in msg_dct:
-                        print("note", msg.note, note.Note(msg.note).nameWithOctave)
                         df_new["note_name"] = note.Note(msg.note).nameWithOctave
 
                     if verbose:
