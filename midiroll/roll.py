@@ -3,6 +3,7 @@ import librosa
 import librosa.display
 import os
 import mido
+from music21 import *
 import numpy as np
 import pandas as pd
 import matplotlib as mpl
@@ -14,17 +15,6 @@ import plotly.express as px
 from turtle import bgcolor
 import re
 from pathlib import Path
-
-# flat="[size=90][sup]\u266d[/sup][/size][size=0].[/size]"
-# sharp="[size=90][sup]\u266f[/sup][/size][size=0].[/size]"
-flat = "\u266d"
-sharp = "\u266f"
-midi_notes = range(132)
-
-note_names = ["C", "C"+sharp, "D", "E"+flat, "E",
-              "F", "F"+sharp, "G", "A"+flat, "A", "B"+flat, "B"]*11
-midi_names = dict(zip(midi_notes, note_names))
-
 
 class MidiFile(mido.MidiFile):
     def __init__(self, path, fname, verbose=False):
@@ -216,7 +206,8 @@ class MidiFile(mido.MidiFile):
                     df_new = pd.DataFrame(msg_dct, index=[idx])
                     df_new["time_counter"] = time_counter
                     if "note" in msg_dct:
-                        df_new["note_name"] = midi_names[msg.note]
+                        print("note", msg.note, note.Note(msg.note).nameWithOctave)
+                        df_new["note_name"] = note.Note(msg.note).nameWithOctave
 
                     if verbose:
                         print(df_new)

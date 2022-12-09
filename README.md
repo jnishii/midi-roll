@@ -16,7 +16,25 @@ I added some arguments to functions, and many corrections for the code.
     - put title on the top
     - save a fig as png
 
+## install libraries
+
+To install required libraries, just run:
+```
+poetry install
+```
+
+## MIDI Data
+
+I'm using
+
 ## Usage
+
+For quick run,
+
+```
+poetry run streamlit run midiroll/roll.py
+```
+
 
 Just see the `__main__` block in the script like this:
 
