@@ -1,4 +1,5 @@
 # midi-visualization
+
 A revised version of python package for midi-visualization, originally distributed in [github.com/exeex/midi-vsualization](https://github.com/exeex/midi-visualization/).
 
 ## Updates from original version
@@ -16,9 +17,12 @@ I added some arguments to functions, and many corrections for the code.
     - put title on the top
     - save a fig as png
 
-## install libraries
+## Environments
 
-To install required libraries, just run:
+Currently I'm using pyenv 3.10.2 with poetry.
+
+1. Install pyenv 3.10.2. Ask Google if you're not familiar with pyenv.
+2. Install libraries using poetry:
 ```
 poetry install
 ```
