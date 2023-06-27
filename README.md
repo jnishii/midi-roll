@@ -25,7 +25,20 @@ poetry install
 
 ## MIDI Data
 
-I'm using [EDB: Music Performance Expression with Phrase Structure](https://crestmuse.jp/pedb_edition2/)
+I'm using MIDI data from [EDB: Music Performance Expression with Phrase Structure](https://crestmuse.jp/pedb_edition2/).
+Off course you can put the data under this repo, but I prefer to put them outside like:
+
+```
+-+- midi-roll/
+ |
+ +- data/pedb2_v0.0.1b/
+```
+and make a symlink:
+```
+cd midi-roll/
+ln -sf ../data .
+```
+Then, you can easily access the data from the codes in this repo.
 
 
 ## Usage
