@@ -30,14 +30,14 @@ poetry install
 ## MIDI Data
 
 I'm using MIDI data from [EDB: Music Performance Expression with Phrase Structure](https://crestmuse.jp/pedb_edition2/).
-Off course you can put the data under this repo, but I prefer to put them outside like:
+You can put the data under this repo, but I prefer to put them outside like:
 
 ```
 -+- midi-roll/
  |
  +- data/pedb2_v0.0.1b/
 ```
-and make a symlink:
+and make a symlink
 ```
 cd midi-roll/
 ln -sf ../data .
@@ -45,22 +45,35 @@ ln -sf ../data .
 Then, you can easily access the data from the codes in this repo.
 
 
-## Usage
+## Codes
 
-For quick run,
+- `midiroll/roll.py`
+    - Get piano-roll image using user friendly web interface.
+    - For quick run,
+        ```
+        poetry run streamlit run midiroll/roll.py
+        ```
+        or
+        ```
+        make run
+        ```
+- midi_analysis.ipynb
+    - Analyse inter-note intervals
+- music21.ipynb
+    - Some graph examples by [music21](https://web.mit.edu/music21/doc/usersGuide/usersGuide_22_graphing.html)
 
+
+To use ipynb files, run jupyter lab:
 ```
-poetry run streamlit run midiroll/roll.py
+poetry run jupyter lab
+```
+or
+```
+make jupyter
 ```
 
 
-Just see the `__main__` block in the script like this:
 
-```
-mid = MidiFile("some_good_music.mid") # set file path
-roll = mid.get_roll(verbose=False)
-mid.draw_roll(figsize=(18,6),xlim=[0,10],colorbar=False)
-```
 
 ## Links
 
