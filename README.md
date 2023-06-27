@@ -25,7 +25,8 @@ poetry install
 
 ## MIDI Data
 
-I'm using
+I'm using [EDB: Music Performance Expression with Phrase Structure](https://crestmuse.jp/pedb_edition2/)
+
 
 ## Usage
 
@@ -48,4 +49,3 @@ mid.draw_roll(figsize=(18,6),xlim=[0,10],colorbar=False)
 
 - [EDB: Music Performance Expression with Phrase Structure](https://crestmuse.jp/pedb_edition2/)
 - [audio visualize_app](https://github.com/root4kaido/audio_visualize_app)
-- [](https://hjp.hatenablog.com/entry/2021/03/01/213026)
