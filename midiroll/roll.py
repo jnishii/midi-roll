@@ -65,14 +65,13 @@ class MidiFile(mido.MidiFile):
         print("Tick length: [ticks]", self.length_ticks)
         print("Time length [s]: ", self.length_seconds)
 
-    @st.cache
     def get_tempo(self):
         try:
             return self.meta["set_tempo"]["tempo"]
         except:
             return 500000
 
-    @st.cache
+    #@st.cache_data
     def get_events(self, verbose=False):
         """
         Extract self.max_nch (default: 16) channel data from MIDI and return a list.
@@ -116,7 +115,7 @@ class MidiFile(mido.MidiFile):
         events = list(filter(None, events))  # remove emtpy channel
         return events, len(events)
 
-    @st.cache
+    #@st.cache_data
     def get_total_ticks(self):
         max_ticks = 0
         for channel in range(self.nch):
@@ -125,7 +124,7 @@ class MidiFile(mido.MidiFile):
                 max_ticks = ticks
         return max_ticks
 
-    @st.cache
+    #@st.cache
     def get_roll(self, events, verbose=False):
         """
         Convert event (channel) data to piano roll data
@@ -213,8 +212,9 @@ class MidiFile(mido.MidiFile):
 
                     df = pd.concat([df, df_new])
 
-            print("exporting csv file: {}".format(self.fname))
-            df.to_csv("outputs/{}.csv".format(self.fname), index=False)
+            fcsv = "outputs/{}.csv".format(self.fname)
+            print("exporting csv file: {}".format(fcsv))
+            df.to_csv(fcsv, index=False)
 
             # if there is a note not closed at the end of a channel, close it
             for key, data in enumerate(register_note):
@@ -302,7 +302,9 @@ class MidiFile(mido.MidiFile):
                 for i in range(self.nch)
             ]
         else:
-            cmap = plt.cm.get_cmap(cmap_name)
+            cmap= mpl.cm.get_cmap(cmap_name)
+            #cmap = mpl.colormaps[cmap_name]
+            print(cmap)
             cmaps = [cmap for i in range(self.nch)]
 
         """
@@ -341,7 +343,8 @@ class MidiFile(mido.MidiFile):
 
         return xlim
 
-    def draw_roll(self, figsize=(15, 9), xlim=None, ylim=None, cmaps=None, bgcolor='white', vlines=None, hlines=False, colorbar=False):
+    def draw_roll(self, figsize=(15, 9), xlim=[], ylim=[30, 92], 
+                  cmaps=None, bgcolor='white', vlines=None, hlines=False, colorbar=False, plot=True):
         """Create piano roll image.
 
         Args:
@@ -360,15 +363,15 @@ class MidiFile(mido.MidiFile):
             
             colorbar (boolean): enable colorbar of intensity
         """
-
-        if xlim == None:
+        print(self.length_seconds)
+        if len(xlim) == 0:
             xlim = [0, int(self.length_seconds)]
 
         fig, ax1, xlim_ticks = self._grp_init(
             figsize=figsize, xlim=xlim, ylim=ylim, bgcolor=bgcolor)
 
         if cmaps == None:
-            self.get_colormap_selector('Purple')
+            cmaps=self.get_colormap_selector('Purple')
 
         for i in range(self.nch):
             try:
@@ -376,7 +379,7 @@ class MidiFile(mido.MidiFile):
                 #target_roll = self.roll[i, :, :]
 
                 max_intensity = np.max(np.array(target_roll))
-                #print("max_intensity:", max_intensity)
+                print("max_intensity:", max_intensity)
                 im = ax1.imshow(self.roll[i], origin="lower",
                                 interpolation='nearest', cmap=cmaps[i], aspect='auto', clim=[0, max_intensity])
                 if hlines != False:
@@ -404,8 +407,11 @@ class MidiFile(mido.MidiFile):
         #plt.ion()
         with st.container():
             st.pyplot(fig)
-        plt.savefig("outputs/"+self.fpath.name+".png", bbox_inches="tight")
-        #plt.show(block=True)
+        fimg = "outputs/{}.png".format(self.fname)
+        print("exporting png file: {}".format(fimg))
+        plt.savefig(fimg, bbox_inches="tight")
+        if plot:
+            plt.show(block=True)
 
 
 def get_dirs(folder_path):
@@ -467,7 +473,8 @@ def main():
         'bgcolor': bgcolor,
         'vlines': xlim,
         'hlines': hlines,
-        'colorbar': None
+        'colorbar': None,
+        'plot': 'False'
     }
     mid.draw_roll(xlim=None, **params)
     mid.draw_roll(xlim=xlim, **params)
