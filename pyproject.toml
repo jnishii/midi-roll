@@ -3,6 +3,7 @@ name = "midi-roll"
 version = "0.1.0"
 description = ""
 authors = ["jnishii <nishii@yamaguchi-u.ac.jp>"]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -22,7 +23,7 @@ watchdog = "^2.2.0"
 numpy = "^1.23.5"
 music21 = "^8.1.0"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

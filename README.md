@@ -19,9 +19,9 @@ I added some arguments to functions, and many corrections for the code.
 
 ## Environments
 
-Currently I'm using pyenv 3.10.2 with poetry.
+Currently I'm using pyenv 3.10.13 with poetry.
 
-1. Install pyenv 3.10.2. Ask Google if you're not familiar with pyenv.
+1. Install pyenv 3.10.13. Ask Google if you're not familiar with pyenv.
 2. Install libraries using poetry:
 ```
 poetry install

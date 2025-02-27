@@ -9,3 +9,6 @@ jupyter:
     
 requirements.txt:
 	pipreqs . --force
+
+clean:
+	rm *~
